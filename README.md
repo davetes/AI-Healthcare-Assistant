@@ -1,6 +1,6 @@
 # AI Healthcare Assistant
 
-A comprehensive, AI-powered healthcare application that helps users monitor their health, get basic medical advice, and manage appointments. Built with modern web technologies and powered by  Groq GPT models.
+A comprehensive, AI-powered healthcare application that helps users monitor their health, get basic medical advice, and manage appointments. Built with modern web technologies and powered by  Groq  models.
 
 ## 🚀 Features
 
@@ -264,7 +264,7 @@ npm run test:all
 NODE_ENV=production
 MONGODB_URI=your-production-mongodb-uri
 JWT_SECRET=your-production-jwt-secret
-OPENAI_API_KEY=your-openai-api-key
+GROQ_API_KEY=your-openai-api-key
 CLIENT_URL=https://yourdomain.com
 ```
 
@@ -317,4 +317,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ for better healthcare accessibility**
+**Made by Tesfahun Kere**
