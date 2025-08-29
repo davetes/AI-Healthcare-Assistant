@@ -95,6 +95,25 @@ router.post('/:sessionId/message', auth, chatMessageLimiter, [
     // Add user message
     await chat.addMessage('user', content);
 
+    // Handle maker/author questions with a friendly fixed response
+    const text = String(content || '').toLowerCase();
+    const asksWhoMade = (
+      text.includes('who made') ||
+      text.includes('who built') ||
+      text.includes('who created') ||
+      (text.includes('developer') && (text.includes('site') || text.includes('app') || text.includes('application') || text.includes('website')))
+    );
+    if (asksWhoMade) {
+      const makerAnswer = 'This application was made by Tesfahun Kere (programmer).';
+      await chat.addMessage('assistant', makerAnswer);
+      await updateChatInsights(chat);
+      return res.json({
+        message: 'Message sent successfully',
+        response: makerAnswer,
+        chat: chat.getSummary()
+      });
+    }
+
     // Get user context for AI response
     const user = await User.findById(userId);
     const userContext = {
