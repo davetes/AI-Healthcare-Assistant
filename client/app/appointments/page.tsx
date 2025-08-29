@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import api, { endpoints } from "../../src/services/api";
 import Link from "next/link";
 
@@ -18,6 +19,7 @@ type Appointment = {
 };
 
 export default function AppointmentsPage() {
+    const router = useRouter();
 	const [items, setItems] = useState<Appointment[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -84,8 +86,10 @@ export default function AppointmentsPage() {
 
 	return (
 		<div className="container-healthcare py-8">
-			<Link href="./">back</Link>
-			<h1 className="text-2xl font-semibold mb-4">Appointments</h1>
+			<div className="flex items-center gap-3 mb-2">
+				<button className="btn btn-outline" onClick={() => router.back()} aria-label="Go back">Back</button>
+				<h1 className="text-2xl font-semibold">Appointments</h1>
+			</div>
 			<p className="text-gray-600 mb-6">Schedule and manage appointments.</p>
 
 			{error && (

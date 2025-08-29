@@ -57,6 +57,10 @@ Focus on being helpful and informative while maintaining appropriate boundaries.
 
   async analyzeSymptoms(symptoms, userContext = {}) {
     try {
+      // If no API key is provided, return a rule-based local assessment so the feature works
+      if (!process.env.GROQ_API_KEY) {
+        return this.ruleBasedAssessment(symptoms, userContext);
+      }
       const system = `
 ${this.systemPrompts.symptomChecker}
 
@@ -117,14 +121,27 @@ Format your response as JSON with the following structure:
 
       const response = completion.choices?.[0]?.message?.content || '';
 
+      // Try direct JSON parse first
       try {
         return JSON.parse(response);
-      } catch (parseError) {
+      } catch (directParseError) {
+        // Attempt to extract JSON block from the response text
+        const firstBrace = response.indexOf('{');
+        const lastBrace = response.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonSlice = response.slice(firstBrace, lastBrace + 1);
+          try {
+            return JSON.parse(jsonSlice);
+          } catch (sliceParseError) {
+            // fall through
+          }
+        }
         return this.parseFallbackResponse(response);
       }
     } catch (error) {
       console.error('AI symptom analysis error:', error);
-      throw new Error('Unable to analyze symptoms at this time. Please try again later.');
+      // Use rule-based assessment as a robust fallback so users always get a result
+      return this.ruleBasedAssessment(symptoms, userContext);
     }
   }
 
@@ -272,6 +289,72 @@ Provide your suggestion in a helpful, informative manner.`;
         actions: ['Monitor symptoms', 'Schedule doctor appointment']
       }
     };
+  }
+
+  // Simple local heuristic to ensure varying, useful results without external API
+  ruleBasedAssessment(symptoms, userContext = {}) {
+    const severityScore = { mild: 1, moderate: 2, severe: 3 };
+    const totalSeverity = (symptoms || []).reduce((sum, s) => sum + (severityScore[(s.severity || 'mild')] || 1), 0);
+    const maxSeverity = (symptoms || []).reduce((max, s) => Math.max(max, severityScore[(s.severity || 'mild')] || 1), 1);
+    const names = (symptoms || []).map(s => (s.name || '').toLowerCase());
+
+    // Very lightweight mapping of common symptoms to conditions
+    const rules = [
+      { match: ['fever', 'cough'], condition: 'Viral respiratory infection', riskBase: 30 },
+      { match: ['headache', 'nausea'], condition: 'Migraine', riskBase: 25 },
+      { match: ['chest pain'], condition: 'Cardiac or musculoskeletal cause', riskBase: 50 },
+      { match: ['fatigue'], condition: 'Fatigue (multifactorial)', riskBase: 20 },
+      { match: ['abdominal pain'], condition: 'Gastrointestinal upset', riskBase: 30 },
+      { match: ['shortness of breath'], condition: 'Respiratory issue', riskBase: 40 },
+    ];
+
+    const matched = rules.filter(r => r.match.some(m => names.includes(m)));
+    const baseConditions = matched.length ? matched : [{ match: [], condition: 'Non-specific presentation', riskBase: 15 }];
+
+    const possibleConditions = baseConditions.slice(0, 3).map((r, idx) => {
+      const probability = Math.min(90, r.riskBase + maxSeverity * 10 + idx * 5);
+      const confidence = Math.min(90, 40 + totalSeverity * 8 - idx * 5);
+      const riskLevel = probability >= 70 ? 'high' : probability >= 45 ? 'medium' : 'low';
+      return {
+        condition: r.condition,
+        probability,
+        confidence,
+        description: 'Estimated from reported symptoms using heuristic rules.',
+        symptoms: names,
+        riskLevel
+      };
+    });
+
+    const recommendations = [];
+    if (maxSeverity >= 3 || names.includes('chest pain') || names.includes('shortness of breath')) {
+      recommendations.push({
+        type: 'emergency',
+        title: 'Seek urgent medical care if symptoms are severe',
+        description: 'If chest pain, severe shortness of breath, fainting, or confusion occur, seek immediate medical attention.',
+        priority: 'urgent',
+        timeframe: 'Immediately'
+      });
+    }
+    recommendations.push({
+      type: 'consultation',
+      title: 'Consult a healthcare professional',
+      description: 'Discuss these symptoms with your healthcare provider for appropriate evaluation.',
+      priority: maxSeverity >= 2 ? 'high' : 'medium',
+      timeframe: maxSeverity >= 2 ? 'Within 1-3 days' : 'Within 1-2 weeks'
+    });
+    recommendations.push({
+      type: 'lifestyle',
+      title: 'Supportive care',
+      description: 'Hydration, balanced diet, rest, and monitoring of symptom changes.',
+      priority: 'medium',
+      timeframe: 'Ongoing'
+    });
+
+    const generalAdvice = 'This is educational guidance only and not a diagnosis. Monitor symptom changes and seek professional care as appropriate.';
+    const whenToSeekHelp = 'If symptoms worsen, new severe symptoms develop, or you are concerned, seek medical attention promptly.';
+    const followUp = { timeframe: '1-2 weeks', actions: ['Monitor symptoms daily', 'Track temperature and severity', 'Consult provider if persistent'] };
+
+    return { possibleConditions, recommendations, generalAdvice, whenToSeekHelp, followUp };
   }
 
   validateResponse(response) {

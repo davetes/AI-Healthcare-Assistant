@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import api, { endpoints } from "../../../src/services/api";
 
 type ChatMessage = {
@@ -9,6 +10,7 @@ type ChatMessage = {
 };
 
 export default function ChatPage() {
+	const router = useRouter();
 	const [sessionId, setSessionId] = useState<string | null>(null);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [input, setInput] = useState("");
@@ -102,7 +104,10 @@ export default function ChatPage() {
 	return (
 		<div className="container-healthcare py-8">
 			<div className="flex items-center justify-between mb-4">
-				<h1 className="text-2xl font-semibold">AI Health Chat</h1>
+				<div className="flex items-center gap-3">
+					<button className="btn btn-outline" onClick={() => router.back()} aria-label="Go back">Back</button>
+					<h1 className="text-2xl font-semibold">AI Health Chat</h1>
+				</div>
 				<button
 					className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
 					onClick={async () => {

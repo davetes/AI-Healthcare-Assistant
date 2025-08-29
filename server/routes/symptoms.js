@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { auth, userActionLimiter } = require('../middleware/auth');
+const { auth, optionalAuth, userActionLimiter } = require('../middleware/auth');
 const Symptom = require('../models/Symptom');
 const User = require('../models/User');
 const aiService = require('../services/aiService');
@@ -10,8 +10,8 @@ const router = express.Router();
 // Rate limiting for symptom checks (max 5 per hour)
 const symptomCheckLimiter = userActionLimiter(5, 60 * 60 * 1000);
 
-// Submit symptoms for AI analysis
-router.post('/check', auth, symptomCheckLimiter, [
+// Submit symptoms for AI analysis (auth optional; unauth users receive assessment but not persistence)
+router.post('/check', optionalAuth, symptomCheckLimiter, [
   body('symptoms').isArray({ min: 1 }).withMessage('At least one symptom is required'),
   body('symptoms.*.name').notEmpty().withMessage('Symptom name is required'),
   body('symptoms.*.severity').isIn(['mild', 'moderate', 'severe']).withMessage('Valid severity levels are: mild, moderate, severe'),
@@ -28,16 +28,16 @@ router.post('/check', auth, symptomCheckLimiter, [
     }
 
     const { symptoms, additionalInfo } = req.body;
-    const userId = req.user._id;
+    const userId = req.user?._id;
 
     // Get user context for better AI analysis
-    const user = await User.findById(userId);
+    const user = userId ? await User.findById(userId) : null;
     const userContext = {
-      age: user.healthProfile?.height ? calculateAge(user.dateOfBirth) : additionalInfo?.age,
-      gender: user.gender || additionalInfo?.gender,
-      existingConditions: user.healthProfile?.chronicConditions?.map(c => c.name) || [],
-      medications: user.healthProfile?.currentMedications?.map(m => m.name) || [],
-      allergies: user.healthProfile?.allergies?.map(a => a.name) || []
+      age: user?.dateOfBirth ? calculateAge(user.dateOfBirth) : additionalInfo?.age,
+      gender: user?.gender || additionalInfo?.gender,
+      existingConditions: user?.healthProfile?.chronicConditions?.map(c => c.name) || [],
+      medications: user?.healthProfile?.currentMedications?.map(m => m.name) || [],
+      allergies: user?.healthProfile?.allergies?.map(a => a.name) || []
     };
 
     // Analyze symptoms using AI
@@ -59,27 +59,40 @@ router.post('/check', auth, symptomCheckLimiter, [
         gender: userContext.gender,
         existingConditions: userContext.existingConditions,
         medications: userContext.medications,
-        familyHistory: user.healthProfile?.familyHistory?.map(f => f.condition) || []
+        familyHistory: user?.healthProfile?.familyHistory?.map(f => f.condition) || []
       },
       aiAssessment,
       tags: symptoms.map(s => s.name.toLowerCase())
     });
 
-    await symptomRecord.save();
+    if (!userId) {
+      return res.status(201).json({
+        message: 'Symptoms analyzed successfully (not saved - login to save history)',
+        assessment: aiAssessment
+      });
+    }
 
-    res.status(201).json({
-      message: 'Symptoms analyzed successfully',
-      assessment: aiAssessment,
-      symptomId: symptomRecord._id
-    });
+    try {
+      await symptomRecord.save();
+      res.status(201).json({
+        message: 'Symptoms analyzed successfully',
+        assessment: aiAssessment,
+        symptomId: symptomRecord._id
+      });
+    } catch (saveError) {
+      console.error('Symptom save error (continuing with assessment):', saveError);
+      // Return assessment even if persistence fails
+      res.status(201).json({
+        message: 'Symptoms analyzed successfully (not saved)',
+        assessment: aiAssessment
+      });
+    }
 
   } catch (error) {
     console.error('Symptom check error:', error);
-    if (error.message.includes('Unable to analyze symptoms')) {
-      res.status(503).json({ error: 'AI service is temporarily unavailable. Please try again later.' });
-    } else {
-      res.status(500).json({ error: 'Failed to analyze symptoms. Please try again.' });
-    }
+    // Provide clearer validation or auth feedback if available
+    const msg = error?.message || 'Failed to analyze symptoms. Please try again.';
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -334,6 +347,7 @@ function calculateAge(dateOfBirth) {
 }
 
 module.exports = router;
+
 
 
 

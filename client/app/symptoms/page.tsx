@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import api, { endpoints } from '../../src/services/api';
@@ -24,6 +24,16 @@ type Assessment = {
 	followUp?: { timeframe?: string; actions?: string[] };
 };
 
+type SymptomSummary = {
+	id: string;
+	symptomCount: number;
+	severity: 'mild' | 'moderate' | 'severe';
+	possibleConditions: number;
+	recommendations: number;
+	status: 'active' | 'resolved' | 'monitoring' | 'escalated';
+	createdAt: string;
+};
+
 export default function SymptomsPage() {
     const router = useRouter();
 	const [symptoms, setSymptoms] = useState<Symptom[]>([
@@ -32,6 +42,26 @@ export default function SymptomsPage() {
 	const [additionalInfo, setAdditionalInfo] = useState<{ age?: number; gender?: string }>({});
 	const [submitting, setSubmitting] = useState(false);
 	const [assessment, setAssessment] = useState<Assessment | null>(null);
+	const [recent, setRecent] = useState<SymptomSummary[]>([]);
+	const [loadingRecent, setLoadingRecent] = useState(false);
+
+	const loadRecent = async () => {
+		try {
+			setLoadingRecent(true);
+			const res = await api.get(endpoints.symptoms.history + '?limit=5');
+			setRecent(res.data?.symptoms ?? []);
+		} catch (e: any) {
+			// likely unauthenticated; ignore
+			setRecent([]);
+		} finally {
+			setLoadingRecent(false);
+		}
+	};
+
+	useEffect(() => {
+		loadRecent();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const updateSymptom = (index: number, updates: Partial<Symptom>) => {
 		setSymptoms(prev => prev.map((s, i) => (i === index ? { ...s, ...updates } : s)));
@@ -49,6 +79,7 @@ export default function SymptomsPage() {
 			setSubmitting(true);
 			const res = await api.post(endpoints.symptoms.check, { symptoms, additionalInfo });
 			setAssessment(res.data.assessment);
+			loadRecent();
 			toast.success('Analysis completed');
 		} catch (error: any) {
 			const msg = error?.response?.data?.error || 'Failed to analyze symptoms';
@@ -113,6 +144,29 @@ export default function SymptomsPage() {
 						</div>
 					</div>
 					<button className="btn btn-primary" onClick={submit} disabled={submitting}>{submitting ? 'Analyzing…' : 'Analyze symptoms'}</button>
+				</div>
+			</div>
+
+			<div className="card">
+				<div className="card-header"><h3 className="font-medium">Recent Checks</h3></div>
+				<div className="card-body">
+					{loadingRecent ? (
+						<div className="text-gray-600">Loading…</div>
+					) : recent.length === 0 ? (
+						<div className="text-gray-600 text-sm">No saved checks yet.</div>
+					) : (
+						<ul className="divide-y">
+							{recent.map(item => (
+								<li key={item.id} className="py-3 flex items-center justify-between">
+									<div>
+										<div className="text-sm font-medium">{new Date(item.createdAt).toLocaleString()}</div>
+										<div className="text-xs text-gray-600">{item.symptomCount} symptom(s) · {item.severity}</div>
+									</div>
+									<a className="text-xs text-primary-700 hover:underline" href={`/symptoms?id=${item.id}`}>Open →</a>
+								</li>
+							))}
+						</ul>
+					)}
 				</div>
 			</div>
 

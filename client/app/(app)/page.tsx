@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api, { endpoints } from "../../src/services/api";
+// Note: Image removed to avoid missing asset issues; using inline SVG instead
 
 type ChatSummary = { sessionId: string; title?: string; updatedAt?: string };
 type AppointmentSummary = { id: string; dateTime: string; type: string; status: string; reason: string };
@@ -109,18 +110,44 @@ export default function DashboardPage() {
 					)}
 				</div>
 				<div className="rounded-lg border border-gray-200 bg-white p-4">
-					<h2 className="font-medium mb-2">Trends (simple preview)</h2>
-					<div className="text-xs text-gray-600 mb-1">Chat volume</div>
-					{miniBars(chatTrend, "bg-primary-600")}
-					<div className="text-xs text-gray-600 mt-3 mb-1">Symptom checks</div>
-					{miniBars(symptomTrend, "bg-emerald-500")}
+					<h2 className="font-medium mb-2">Trends</h2>
+					<div className="text-xs text-gray-600 mb-2">Weekly activity</div>
+					<svg viewBox="0 0 300 100" className="w-full h-24">
+						<defs>
+							<linearGradient id="gradChat" x1="0" x2="0" y1="0" y2="1">
+								<stop offset="0%" stopColor="#2563eb" stopOpacity="0.4" />
+								<stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+							</linearGradient>
+							<linearGradient id="gradSym" x1="0" x2="0" y1="0" y2="1">
+								<stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+								<stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+							</linearGradient>
+						</defs>
+						<polyline fill="none" stroke="#2563eb" strokeWidth="2" points={pointsFromSeries(chatTrend)} />
+						<polyline fill="none" stroke="#10b981" strokeWidth="2" points={pointsFromSeries(symptomTrend)} />
+					</svg>
+					<div className="text-xs text-gray-500 mt-1">Blue: Chat • Green: Symptoms</div>
 				</div>
 			</div>
 
 			<div className="rounded-lg border border-gray-200 bg-white p-4">
 				<h2 className="font-medium mb-2">Recent chats</h2>
 				{recentChats.length === 0 ? (
-					<p className="text-sm text-gray-600">No recent chats.</p>
+					<div className="flex items-center gap-4">
+						<svg width="96" height="64" viewBox="0 0 96 64" className="rounded-md">
+							<defs>
+								<linearGradient id="grad" x1="0" x2="0" y1="0" y2="1">
+									<stop offset="0%" stopColor="#e0f2fe" />
+									<stop offset="100%" stopColor="#f0f9ff" />
+								</linearGradient>
+							</defs>
+							<rect x="0" y="0" width="96" height="64" fill="url(#grad)" rx="8" />
+							<path d="M10 40 L30 40 L38 22 L50 48 L58 34 L86 34" stroke="#2563eb" strokeWidth="3" fill="none" strokeLinecap="round" />
+							<circle cx="30" cy="40" r="3" fill="#2563eb" />
+							<circle cx="58" cy="34" r="3" fill="#2563eb" />
+						</svg>
+						<p className="text-sm text-gray-600">No recent chats.</p>
+					</div>
 				) : (
 					<ul className="divide-y">
 						{recentChats.map(c => (
@@ -140,3 +167,10 @@ export default function DashboardPage() {
 }
 
 
+// Convert a small series to SVG polyline points
+function pointsFromSeries(series: number[]) {
+    const n = Math.max(1, series.length);
+    const max = Math.max(1, ...series);
+    const stepX = 300 / (n - 1 || 1);
+    return series.map((v, i) => `${i * stepX},${100 - (v / max) * 80 - 10}`).join(" ");
+}
