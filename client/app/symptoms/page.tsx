@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import api, { endpoints } from '../../src/services/api';
 
@@ -24,6 +25,7 @@ type Assessment = {
 };
 
 export default function SymptomsPage() {
+    const router = useRouter();
 	const [symptoms, setSymptoms] = useState<Symptom[]>([
 		{ name: '', severity: 'moderate', duration: { value: 1, unit: 'days' }, description: '' }
 	]);
@@ -59,7 +61,10 @@ export default function SymptomsPage() {
 	return (
 		<div className="container-healthcare py-8 space-y-6">
 			<div className="flex items-center justify-between">
-				<h1 className="text-2xl font-semibold">Symptom Checker</h1>
+				<div className="flex items-center gap-3">
+					<button className="btn btn-outline" onClick={() => router.back()} aria-label="Go back">Back</button>
+					<h1 className="text-2xl font-semibold">Symptom Checker</h1>
+				</div>
 				<button className="btn btn-outline" onClick={() => setAssessment(null)}>Clear Results</button>
 			</div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api, { endpoints } from "../../src/services/api";
+import Link from "next/link";
 
 type Appointment = {
 	id: string;
@@ -83,6 +84,7 @@ export default function AppointmentsPage() {
 
 	return (
 		<div className="container-healthcare py-8">
+			<Link href="./">back</Link>
 			<h1 className="text-2xl font-semibold mb-4">Appointments</h1>
 			<p className="text-gray-600 mb-6">Schedule and manage appointments.</p>
 

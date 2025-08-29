@@ -5,6 +5,61 @@ const User = require('../models/User');
 
 const router = express.Router();
 
+// Get own profile (public-safe shape)
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('-password -__v');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Update own profile (basic demographics and contacts)
+router.put('/me', auth, [
+  body('firstName').optional().trim().notEmpty().withMessage('First name cannot be empty'),
+  body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
+  body('gender').optional().isIn(['male', 'female', 'other', 'prefer-not-to-say']).withMessage('Invalid gender'),
+  body('phoneNumber').optional().trim(),
+  body('emergencyContact.name').optional().trim().notEmpty().withMessage('Emergency contact name cannot be empty'),
+  body('emergencyContact.relationship').optional().trim().notEmpty().withMessage('Emergency contact relationship cannot be empty'),
+  body('emergencyContact.phoneNumber').optional().trim().notEmpty().withMessage('Emergency contact phone cannot be empty')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const allowed = ['firstName', 'lastName', 'gender', 'phoneNumber', 'emergencyContact', 'dateOfBirth'];
+    const updates = Object.keys(req.body)
+      .filter(k => allowed.includes(k))
+      .reduce((acc, key) => { acc[key] = req.body[key]; return acc; }, {});
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password -__v');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Profile updated successfully', user });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
 // Get user's health profile
 router.get('/health-profile', auth, async (req, res) => {
   try {
@@ -466,6 +521,87 @@ function calculateAge(dateOfBirth) {
   return age;
 }
 
+// Get preferences
+router.get('/preferences', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('preferences');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ preferences: user.preferences });
+  } catch (error) {
+    console.error('Get preferences error:', error);
+    res.status(500).json({ error: 'Failed to fetch preferences' });
+  }
+});
+
+// Update preferences
+router.put('/preferences', auth, [
+  body('notifications.email').optional().isBoolean(),
+  body('notifications.sms').optional().isBoolean(),
+  body('notifications.push').optional().isBoolean(),
+  body('privacy.shareData').optional().isBoolean(),
+  body('privacy.anonymousUsage').optional().isBoolean(),
+  body('language').optional().isString()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const updates = {};
+    if (req.body.notifications) updates['preferences.notifications'] = req.body.notifications;
+    if (req.body.privacy) updates['preferences.privacy'] = req.body.privacy;
+    if (req.body.language) updates['preferences.language'] = req.body.language;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('preferences');
+
+    res.json({ message: 'Preferences updated successfully', preferences: user.preferences });
+  } catch (error) {
+    console.error('Update preferences error:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
+// Change password
+router.put('/password', auth, [
+  body('currentPassword').exists().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const matches = await user.comparePassword(currentPassword);
+    if (!matches) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Update password error:', error);
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 module.exports = router;
+
+
 
 

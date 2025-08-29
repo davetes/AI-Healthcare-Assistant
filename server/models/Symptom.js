@@ -144,3 +144,5 @@ symptomSchema.methods.getSummary = function() {
 module.exports = mongoose.model('Symptom', symptomSchema);
 
 
+
+
