@@ -12,6 +12,7 @@ export default function ProfilePage() {
 	const [saving, setSaving] = useState(false);
 
 	const [profile, setProfile] = useState({
+		avatarUrl: '',
 		firstName: '',
 		lastName: '',
 		phoneNumber: '',
@@ -32,6 +33,7 @@ export default function ProfilePage() {
 	useEffect(() => {
 		if (user) {
 			setProfile({
+				avatarUrl: user.avatarUrl || '',
 				firstName: user.firstName || '',
 				lastName: user.lastName || '',
 				phoneNumber: user.phoneNumber || '',
@@ -115,6 +117,31 @@ export default function ProfilePage() {
 			</div>
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				{/* Avatar */}
+				<div className="card">
+					<div className="card-header">
+						<h2 className="font-medium">Profile Image</h2>
+					</div>
+					<div className="card-body space-y-3">
+						<div className="flex items-center gap-4">
+							<div className="h-20 w-20 rounded-full overflow-hidden bg-gray-200">
+								{profile.avatarUrl ? (
+									<img src={profile.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+								) : (
+									<div className="h-full w-full flex items-center justify-center text-gray-500 text-sm">No image</div>
+								)}
+							</div>
+							<div className="flex-1">
+								<label className="form-label">Image URL</label>
+								<input className="form-input" placeholder="https://..." value={profile.avatarUrl} onChange={e => setProfile(p => ({ ...p, avatarUrl: e.target.value }))} />
+								<p className="text-xs text-gray-500 mt-1">Paste a direct image URL. We keep it simple without uploads.</p>
+							</div>
+						</div>
+					</div>
+					<div className="card-footer">
+						<button className="btn btn-primary" onClick={saveAccount} disabled={saving}>{saving ? 'Saving…' : 'Save image'}</button>
+					</div>
+				</div>
 				{/* Account Information */}
 				<div className="card">
 					<div className="card-header">

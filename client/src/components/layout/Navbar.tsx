@@ -28,7 +28,14 @@ export default function Navbar() {
 							</Link>
 						))}
 					</nav>
-					<span className="text-sm text-gray-600">{user?.firstName}</span>
+					<div className="flex items-center gap-2">
+						{user?.avatarUrl ? (
+							<div className="h-8 w-8 rounded-full overflow-hidden bg-gray-200">
+								<img src={user.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+							</div>
+						) : null}
+						<span className="text-sm text-gray-600">{user?.firstName}</span>
+					</div>
 					<button className="btn btn-outline btn-sm" onClick={async () => { await logout(); router.replace('/login'); }}>Logout</button>
 				</div>
 			</div>

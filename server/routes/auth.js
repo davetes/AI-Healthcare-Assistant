@@ -133,6 +133,7 @@ router.get('/profile', auth, async (req, res) => {
 router.put('/profile', auth, [
   body('firstName').optional().trim().notEmpty().withMessage('First name cannot be empty'),
   body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
+  body('avatarUrl').optional().isURL().withMessage('Avatar must be a valid URL'),
   body('phoneNumber').optional().trim(),
   body('emergencyContact.name').optional().trim(),
   body('emergencyContact.relationship').optional().trim(),
@@ -147,7 +148,7 @@ router.put('/profile', auth, [
 
     const updates = req.body;
     const allowedUpdates = [
-      'firstName', 'lastName', 'phoneNumber', 'emergencyContact',
+      'firstName', 'lastName', 'avatarUrl', 'phoneNumber', 'emergencyContact',
       'healthProfile', 'preferences'
     ];
 

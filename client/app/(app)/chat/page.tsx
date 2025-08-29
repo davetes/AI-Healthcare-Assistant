@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api, { endpoints } from "../../../src/services/api";
+import { useSearchParams } from "next/navigation";
 
 type ChatMessage = {
 	role: "user" | "assistant" | "system";
@@ -11,6 +12,7 @@ type ChatMessage = {
 
 export default function ChatPage() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const [sessionId, setSessionId] = useState<string | null>(null);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [input, setInput] = useState("");
@@ -28,8 +30,19 @@ export default function ChatPage() {
 			try {
 				setBooting(true);
 				setError(null);
-				const { data } = await api.post(endpoints.chat.start, { category: "general" });
-				setSessionId(data?.chat?.sessionId ?? null);
+				const sessionIdFromParams = searchParams.get("session");
+				if (sessionIdFromParams) {
+					const { data } = await api.get(endpoints.chat.getSession(sessionIdFromParams));
+					if (data?.chat?.sessionId) {
+						setSessionId(data.chat.sessionId);
+						setMessages([]); // Clear previous messages for a new session
+					} else {
+						throw new Error("Invalid session ID in URL.");
+					}
+				} else {
+					const { data } = await api.post(endpoints.chat.start, { category: "general" });
+					setSessionId(data?.chat?.sessionId ?? null);
+				}
 			} catch (e: any) {
 				setError("Unable to start chat. You may need to login.");
 			} finally {
@@ -37,7 +50,7 @@ export default function ChatPage() {
 			}
 		};
 		init();
-	}, []);
+	}, [searchParams]);
 
 	useEffect(() => {
 		if (scrollRef.current) {

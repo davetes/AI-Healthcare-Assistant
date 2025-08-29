@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { endpoints } from "../../src/services/api";
 // Note: Image removed to avoid missing asset issues; using inline SVG instead
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
 type ChatSummary = { sessionId: string; title?: string; updatedAt?: string };
 type AppointmentSummary = { id: string; dateTime: string; type: string; status: string; reason: string };
@@ -12,26 +13,39 @@ export default function DashboardPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [recentChats, setRecentChats] = useState<ChatSummary[]>([]);
 	const [upcoming, setUpcoming] = useState<AppointmentSummary | null>(null);
+	const [upcomingList, setUpcomingList] = useState<AppointmentSummary[]>([]);
 	const [chatTrend, setChatTrend] = useState<number[]>([]);
 	const [symptomTrend, setSymptomTrend] = useState<number[]>([]);
+	const [severityBreakdown, setSeverityBreakdown] = useState<{ mild?: number; moderate?: number; severe?: number }>({});
+	const [symptomTotals, setSymptomTotals] = useState<{ total: number; active: number; resolved: number; highUrgency: number }>({ total: 0, active: 0, resolved: 0, highUrgency: 0 });
 
 	useEffect(() => {
 		const load = async () => {
 			try {
 				setLoading(true);
 				setError(null);
-				const [chatsRes, apptRes] = await Promise.all([
+				const [chatsRes, apptRes, symRes] = await Promise.all([
 					api.get(endpoints.chat.history + "?limit=5"),
-					api.get(endpoints.appointments.list + "?limit=10"),
+					api.get(endpoints.appointments.list + "?limit=50"),
+					api.get(endpoints.symptoms.stats)
 				]);
 				const chats = chatsRes.data?.chats ?? [];
 				setRecentChats(chats.map((c: any) => ({ sessionId: c.sessionId, title: c.title, updatedAt: c.updatedAt })));
 				const appts = apptRes.data?.appointments ?? [];
-				const next = appts.find((a: any) => new Date(a.dateTime) > new Date());
+				const future = appts.filter((a: any) => new Date(a.dateTime) > new Date()).sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+				const next = future[0];
 				setUpcoming(next ? { id: next.id, dateTime: next.dateTime, type: next.type, status: next.status, reason: next.reason } : null);
+				setUpcomingList(future.slice(0, 3).map((a: any) => ({ id: a.id, dateTime: a.dateTime, type: a.type, status: a.status, reason: a.reason })));
 				// Simple placeholder trends until backend supports stats endpoints
-				setChatTrend(chats.length ? new Array(Math.min(8, chats.length)).fill(0).map((_, i) => i + 1) : [1,2,1,3,2,4,3,5]);
-				setSymptomTrend([2,1,3,2,4,2,5,3]);
+				setChatTrend(chats.length ? new Array(Math.min(8, chats.length)).fill(0).map((_, i) => i + 1) : [1, 2, 1, 3, 2, 4, 3, 5]);
+				setSymptomTrend([2, 1, 3, 2, 4, 2, 5, 3]);
+				const sym = symRes.data || {};
+				setSymptomTotals({ total: sym.total || 0, active: sym.active || 0, resolved: sym.resolved || 0, highUrgency: sym.highUrgency || 0 });
+				setSeverityBreakdown({
+					mild: sym.severityBreakdown?.mild || 0,
+					moderate: sym.severityBreakdown?.moderate || 0,
+					severe: sym.severityBreakdown?.severe || 0
+				});
 			} catch (e: any) {
 				setError(e?.response?.data?.error || "Failed to load dashboard data");
 			} finally {
@@ -60,12 +74,57 @@ export default function DashboardPage() {
 
 	return (
 		<div className="container-healthcare py-8">
-			<h1 className="text-2xl font-semibold mb-4">AI Healthcare Assistant</h1>
+			<div className="flex items-center justify-between mb-4">
+				<h1 className="text-2xl font-semibold">AI Healthcare Assistant</h1>
+			</div>
 			<p className="text-gray-600 mb-6">Your companion for general health guidance, symptom insights, and appointment management. This app provides educational information and wellness support, not medical diagnosis.</p>
 
-			{error && (
-				<div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>
-			)}
+			{/* AI + Hospital hero illustration */}
+			<div className="rounded-lg border border-gray-200 bg-white p-4 mb-8">
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+					<div className="md:col-span-2">
+						<svg viewBox="0 0 600 220" className="w-full h-40 md:h-44">
+							<defs>
+								<linearGradient id="heroSky" x1="0" x2="0" y1="0" y2="1">
+									<stop offset="0%" stopColor="#eef2ff" />
+									<stop offset="100%" stopColor="#f8fafc" />
+								</linearGradient>
+								<linearGradient id="aiGlow" x1="0" x2="0" y1="0" y2="1">
+									<stop offset="0%" stopColor="#2563eb" stopOpacity="0.15" />
+									<stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+								</linearGradient>
+							</defs>
+							<rect x="0" y="0" width="600" height="220" fill="url(#heroSky)" rx="12" />
+							{/* Hospital */}
+							<rect x="40" y="60" width="160" height="110" fill="#ffffff" stroke="#e5e7eb" />
+							<rect x="100" y="40" width="40" height="20" fill="#ffffff" stroke="#e5e7eb" />
+							<rect x="70" y="90" width="30" height="30" fill="#f1f5f9" />
+							<rect x="140" y="90" width="30" height="30" fill="#f1f5f9" />
+							<rect x="105" y="120" width="30" height="50" fill="#e2e8f0" />
+							<rect x="115" y="125" width="10" height="20" fill="#94a3b8" />
+							<rect x="110" y="70" width="20" height="8" fill="#ef4444" />
+							<rect x="117" y="63" width="6" height="22" fill="#ef4444" />
+							{/* AI chip */}
+							<circle cx="380" cy="110" r="48" fill="url(#aiGlow)" />
+							<rect x="350" y="80" width="60" height="60" rx="10" fill="#1d4ed8" />
+							<rect x="360" y="90" width="40" height="40" rx="6" fill="#93c5fd" />
+							<circle cx="380" cy="110" r="10" fill="#1d4ed8" />
+							{/* Connection lines */}
+							<path d="M200 115 C 260 115, 300 110, 350 110" stroke="#60a5fa" strokeWidth="2" fill="none" strokeDasharray="4 4" />
+						</svg>
+					</div>
+					<div className="space-y-2 text-sm text-gray-700">
+						<div className="font-medium">Smart, safe, and supportive</div>
+						<ul className="list-disc pl-5">
+							<li>AI-assisted insights for symptoms and wellness</li>
+							<li>Clear guidance on when to seek care</li>
+							<li>Appointments and chats in one place</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+
 
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
 				<div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -108,25 +167,48 @@ export default function DashboardPage() {
 							<div className="text-gray-600">{upcoming.reason}</div>
 						</div>
 					)}
+					{upcomingList?.length > 1 && (
+						<div className="mt-3">
+							<div className="text-xs text-gray-500 mb-1">Next appointments</div>
+							<ul className="space-y-1 text-xs text-gray-700">
+								{upcomingList.slice(1).map(a => (
+									<li key={a.id}>{new Date(a.dateTime).toLocaleString()} · {a.type} · {a.status}</li>
+								))}
+							</ul>
+						</div>
+					)}
 				</div>
 				<div className="rounded-lg border border-gray-200 bg-white p-4">
 					<h2 className="font-medium mb-2">Trends</h2>
 					<div className="text-xs text-gray-600 mb-2">Weekly activity</div>
-					<svg viewBox="0 0 300 100" className="w-full h-24">
-						<defs>
-							<linearGradient id="gradChat" x1="0" x2="0" y1="0" y2="1">
-								<stop offset="0%" stopColor="#2563eb" stopOpacity="0.4" />
-								<stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
-							</linearGradient>
-							<linearGradient id="gradSym" x1="0" x2="0" y1="0" y2="1">
-								<stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-								<stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-							</linearGradient>
-						</defs>
-						<polyline fill="none" stroke="#2563eb" strokeWidth="2" points={pointsFromSeries(chatTrend)} />
-						<polyline fill="none" stroke="#10b981" strokeWidth="2" points={pointsFromSeries(symptomTrend)} />
-					</svg>
+					<div className="w-full h-32">
+						<ResponsiveContainer width="100%" height="100%">
+							<LineChart data={mergeSeriesForChart(chatTrend, symptomTrend)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+								<XAxis dataKey="i" hide />
+								<YAxis hide />
+								<Tooltip formatter={(v: any, name: any) => [v, name === 'chat' ? 'Chat' : 'Symptoms']} />
+								<Line type="monotone" dataKey="chat" stroke="#2563eb" strokeWidth={2} dot={false} />
+								<Line type="monotone" dataKey="symptoms" stroke="#10b981" strokeWidth={2} dot={false} />
+							</LineChart>
+						</ResponsiveContainer>
+					</div>
 					<div className="text-xs text-gray-500 mt-1">Blue: Chat • Green: Symptoms</div>
+					<div className="mt-4">
+						<div className="text-xs text-gray-600 mb-2">Symptom severity (last 30 days)</div>
+						<div className="w-full h-32">
+							<ResponsiveContainer width="100%" height="100%">
+								<BarChart data={[{ name: 'Severity', mild: severityBreakdown.mild || 0, moderate: severityBreakdown.moderate || 0, severe: severityBreakdown.severe || 0 }]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+									<XAxis dataKey="name" hide />
+									<YAxis hide />
+									<Tooltip />
+									<Bar dataKey="mild" fill="#3b82f6" />
+									<Bar dataKey="moderate" fill="#f59e0b" />
+									<Bar dataKey="severe" fill="#ef4444" />
+								</BarChart>
+							</ResponsiveContainer>
+						</div>
+						<div className="text-xs text-gray-500 mt-2">Total: {symptomTotals.total} · Active: {symptomTotals.active} · Resolved: {symptomTotals.resolved} · High urgency: {symptomTotals.highUrgency}</div>
+					</div>
 				</div>
 			</div>
 
@@ -169,8 +251,15 @@ export default function DashboardPage() {
 
 // Convert a small series to SVG polyline points
 function pointsFromSeries(series: number[]) {
-    const n = Math.max(1, series.length);
-    const max = Math.max(1, ...series);
-    const stepX = 300 / (n - 1 || 1);
-    return series.map((v, i) => `${i * stepX},${100 - (v / max) * 80 - 10}`).join(" ");
+	const n = Math.max(1, series.length);
+	const max = Math.max(1, ...series);
+	const stepX = 300 / (n - 1 || 1);
+	return series.map((v, i) => `${i * stepX},${100 - (v / max) * 80 - 10}`).join(" ");
+}
+
+// Simple helper to compute bar height percentage for severity bars
+function barHeight(value?: number) {
+	const v = typeof value === 'number' ? value : 0;
+	const max = Math.max(1, v, 5); // ensure some visual height baseline
+	return Math.min(100, Math.round((v / max) * 100));
 }

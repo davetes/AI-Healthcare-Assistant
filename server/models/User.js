@@ -25,6 +25,10 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  avatarUrl: {
+    type: String,
+    trim: true
+  },
   dateOfBirth: {
     type: Date,
     required: true
