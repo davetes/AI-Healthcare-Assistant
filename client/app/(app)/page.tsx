@@ -36,9 +36,23 @@ export default function DashboardPage() {
 				const next = future[0];
 				setUpcoming(next ? { id: next.id, dateTime: next.dateTime, type: next.type, status: next.status, reason: next.reason } : null);
 				setUpcomingList(future.slice(0, 3).map((a: any) => ({ id: a.id, dateTime: a.dateTime, type: a.type, status: a.status, reason: a.reason })));
-				// Simple placeholder trends until backend supports stats endpoints
-				setChatTrend(chats.length ? new Array(Math.min(8, chats.length)).fill(0).map((_, i) => i + 1) : [1, 2, 1, 3, 2, 4, 3, 5]);
-				setSymptomTrend([2, 1, 3, 2, 4, 2, 5, 3]);
+				// Build 7-day activity series (today - 6 to today)
+				const days: string[] = [];
+				const fmt = (d: Date) => d.toISOString().slice(0,10);
+				for (let i = 6; i >= 0; i--) {
+					const d = new Date();
+					d.setDate(d.getDate() - i);
+					days.push(fmt(d));
+				}
+				const short = (iso: string) => {
+					const d = new Date(iso);
+					return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+				};
+				const chatCounts = days.map(key => (chats.filter((c: any) => (c.updatedAt ? c.updatedAt.slice(0,10) === key : false)).length));
+				// Without a dedicated endpoint for symptom events by day, approximate from stats (fallback zeros)
+				const symCounts = days.map(() => 0);
+				setChatTrend(chatCounts);
+				setSymptomTrend(symCounts);
 				const sym = symRes.data || {};
 				setSymptomTotals({ total: sym.total || 0, active: sym.active || 0, resolved: sym.resolved || 0, highUrgency: sym.highUrgency || 0 });
 				setSeverityBreakdown({
@@ -71,6 +85,17 @@ export default function DashboardPage() {
 		{ label: "Start your first chat", href: "/chat" },
 		{ label: "Schedule an appointment", href: "/appointments" },
 	], []);
+
+	// Derive severity data for chart with a visual baseline when all are zero
+	const hasSeverity = (severityBreakdown.mild || 0) + (severityBreakdown.moderate || 0) + (severityBreakdown.severe || 0) > 0;
+	const severityData = [
+		{
+			name: 'Severity',
+			mild: hasSeverity ? (severityBreakdown.mild || 0) : 1,
+			moderate: hasSeverity ? (severityBreakdown.moderate || 0) : 1,
+			severe: hasSeverity ? (severityBreakdown.severe || 0) : 1
+		}
+	];
 
 	return (
 		<div className="container-healthcare py-8">
@@ -184,7 +209,7 @@ export default function DashboardPage() {
 					<div className="w-full h-32">
 						<ResponsiveContainer width="100%" height="100%">
 							<LineChart data={mergeSeriesForChart(chatTrend, symptomTrend)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-								<XAxis dataKey="i" hide />
+								<XAxis dataKey="label" />
 								<YAxis hide />
 								<Tooltip formatter={(v: any, name: any) => [v, name === 'chat' ? 'Chat' : 'Symptoms']} />
 								<Line type="monotone" dataKey="chat" stroke="#2563eb" strokeWidth={2} dot={false} />
@@ -197,17 +222,22 @@ export default function DashboardPage() {
 						<div className="text-xs text-gray-600 mb-2">Symptom severity (last 30 days)</div>
 						<div className="w-full h-32">
 							<ResponsiveContainer width="100%" height="100%">
-								<BarChart data={[{ name: 'Severity', mild: severityBreakdown.mild || 0, moderate: severityBreakdown.moderate || 0, severe: severityBreakdown.severe || 0 }]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+								<BarChart data={severityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
 									<XAxis dataKey="name" hide />
 									<YAxis hide />
 									<Tooltip />
-									<Bar dataKey="mild" fill="#3b82f6" />
-									<Bar dataKey="moderate" fill="#f59e0b" />
-									<Bar dataKey="severe" fill="#ef4444" />
+									<Bar dataKey="mild" fill="#3b82f6" isAnimationActive={false} />
+									<Bar dataKey="moderate" fill="#f59e0b" isAnimationActive={false} />
+									<Bar dataKey="severe" fill="#ef4444" isAnimationActive={false} />
 								</BarChart>
 							</ResponsiveContainer>
 						</div>
-						<div className="text-xs text-gray-500 mt-2">Total: {symptomTotals.total} · Active: {symptomTotals.active} · Resolved: {symptomTotals.resolved} · High urgency: {symptomTotals.highUrgency}</div>
+						<div className="text-xs text-gray-500 mt-2">
+							{!hasSeverity ? (
+								<span>No data yet. Bars shown as placeholders.</span>
+							) : null}
+							<span className="ml-1">Total: {symptomTotals.total} · Active: {symptomTotals.active} · Resolved: {symptomTotals.resolved} · High urgency: {symptomTotals.highUrgency}</span>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -262,4 +292,18 @@ function barHeight(value?: number) {
 	const v = typeof value === 'number' ? value : 0;
 	const max = Math.max(1, v, 5); // ensure some visual height baseline
 	return Math.min(100, Math.round((v / max) * 100));
+}
+
+function mergeSeriesForChart(a: number[], b: number[]) {
+    const length = Math.max(a.length, b.length);
+    const pad = (arr: number[], l: number) => arr.concat(Array(Math.max(0, l - arr.length)).fill(0));
+    const aa = pad(a, length);
+    const bb = pad(b, length);
+    const labels: string[] = [];
+    for (let i = length - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - (length - 1 - i));
+        labels.push(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]);
+    }
+    return aa.map((v, i) => ({ label: labels[i], chat: v, symptoms: bb[i] }));
 }
