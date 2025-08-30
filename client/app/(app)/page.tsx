@@ -24,21 +24,24 @@ export default function DashboardPage() {
 			try {
 				setLoading(true);
 				setError(null);
+				const nowIso = new Date().toISOString();
 				const [chatsRes, apptRes, symRes] = await Promise.all([
 					api.get(endpoints.chat.history + "?limit=5"),
-					api.get(endpoints.appointments.list + "?limit=50"),
+					api.get(`${endpoints.appointments.search}?status=scheduled&startDate=${encodeURIComponent(nowIso)}&limit=50`),
 					api.get(endpoints.symptoms.stats)
 				]);
 				const chats = chatsRes.data?.chats ?? [];
 				setRecentChats(chats.map((c: any) => ({ sessionId: c.sessionId, title: c.title, updatedAt: c.updatedAt })));
 				const appts = apptRes.data?.appointments ?? [];
-				const future = appts.filter((a: any) => new Date(a.dateTime) > new Date()).sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+				const future = appts
+					.filter((a: any) => a.status === 'scheduled' && new Date(a.dateTime).getTime() > Date.now())
+					.sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 				const next = future[0];
 				setUpcoming(next ? { id: next.id, dateTime: next.dateTime, type: next.type, status: next.status, reason: next.reason } : null);
 				setUpcomingList(future.slice(0, 3).map((a: any) => ({ id: a.id, dateTime: a.dateTime, type: a.type, status: a.status, reason: a.reason })));
 				// Build 7-day activity series (today - 6 to today)
 				const days: string[] = [];
-				const fmt = (d: Date) => d.toISOString().slice(0,10);
+				const fmt = (d: Date) => d.toISOString().slice(0, 10);
 				for (let i = 6; i >= 0; i--) {
 					const d = new Date();
 					d.setDate(d.getDate() - i);
@@ -46,9 +49,9 @@ export default function DashboardPage() {
 				}
 				const short = (iso: string) => {
 					const d = new Date(iso);
-					return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+					return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
 				};
-				const chatCounts = days.map(key => (chats.filter((c: any) => (c.updatedAt ? c.updatedAt.slice(0,10) === key : false)).length));
+				const chatCounts = days.map(key => (chats.filter((c: any) => (c.updatedAt ? c.updatedAt.slice(0, 10) === key : false)).length));
 				// Without a dedicated endpoint for symptom events by day, approximate from stats (fallback zeros)
 				const symCounts = days.map(() => 0);
 				setChatTrend(chatCounts);
@@ -98,11 +101,21 @@ export default function DashboardPage() {
 	];
 
 	return (
-		<div className="container-healthcare py-8">
+		<div className="container-healthcare py-8 ">
 			<div className="flex items-center justify-between mb-4">
-				<h1 className="text-2xl font-semibold">AI Healthcare Assistant</h1>
+				<h1 className="text-4xl font-bold text-center text-indigo-600 drop-shadow-lg tracking-wide">
+					AI Healthcare Assistant
+				</h1>
+
 			</div>
-			<p className="text-gray-600 mb-6">Your companion for general health guidance, symptom insights, and appointment management. This app provides educational information and wellness support, not medical diagnosis.</p>
+			<p className="text-gray-600 mb-6 leading-relaxed">
+				Your intelligent companion for everyday health guidance, personalized symptom insights,
+				and seamless appointment management. This assistant helps you track your wellness goals,
+				understand potential health indicators, and stay informed with evidence-based tips —
+				all while ensuring your data privacy and security. <br />
+				<strong>Disclaimer:</strong> This app provides educational information and general wellness support.
+				It is not a substitute for professional medical advice, diagnosis, or treatment.
+			</p>
 
 			{/* AI + Hospital hero illustration */}
 			<div className="rounded-lg border border-gray-200 bg-white p-4 mb-8">
@@ -295,15 +308,15 @@ function barHeight(value?: number) {
 }
 
 function mergeSeriesForChart(a: number[], b: number[]) {
-    const length = Math.max(a.length, b.length);
-    const pad = (arr: number[], l: number) => arr.concat(Array(Math.max(0, l - arr.length)).fill(0));
-    const aa = pad(a, length);
-    const bb = pad(b, length);
-    const labels: string[] = [];
-    for (let i = length - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - (length - 1 - i));
-        labels.push(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]);
-    }
-    return aa.map((v, i) => ({ label: labels[i], chat: v, symptoms: bb[i] }));
+	const length = Math.max(a.length, b.length);
+	const pad = (arr: number[], l: number) => arr.concat(Array(Math.max(0, l - arr.length)).fill(0));
+	const aa = pad(a, length);
+	const bb = pad(b, length);
+	const labels: string[] = [];
+	for (let i = length - 1; i >= 0; i--) {
+		const d = new Date();
+		d.setDate(d.getDate() - (length - 1 - i));
+		labels.push(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]);
+	}
+	return aa.map((v, i) => ({ label: labels[i], chat: v, symptoms: bb[i] }));
 }

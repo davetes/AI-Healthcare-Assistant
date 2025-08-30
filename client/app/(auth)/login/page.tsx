@@ -38,43 +38,49 @@ export default function LoginPage() {
 	};
 
 	return (
-		<div>
-			<h1 className="text-2xl font-semibold mb-4">Login</h1>
-			<p className="text-gray-600 mb-6">Access your AI Healthcare Assistant account.</p>
+		<div className="p-6 bg-green-50 rounded-lg shadow-md max-w-md mx-auto">
+			<h1 className="text-2xl font-semibold mb-4 text-green-800">Login</h1>
+			<p className="text-green-700 mb-6">Access your AI Healthcare Assistant account.</p>
+
 			<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 				<div>
-					<label className="form-label" htmlFor="email">Email</label>
+					<label className="form-label text-green-800" htmlFor="email">Email</label>
 					<input
 						id="email"
 						type="email"
-						className="form-input"
+						className="form-input border-green-300 focus:border-green-500 focus:ring focus:ring-green-200"
 						placeholder="you@example.com"
 						{...register('email', {
 							required: 'Email is required',
 							pattern: { value: /[^@\s]+@[^@\s]+\.[^@\s]+/, message: 'Enter a valid email' }
 						})}
 					/>
-					{errors.email && <p className="form-error">{errors.email.message as string}</p>}
+					{errors.email && <p className="form-error text-red-600">{errors.email.message as string}</p>}
 				</div>
+
 				<div>
-					<label className="form-label" htmlFor="password">Password</label>
+					<label className="form-label text-green-800" htmlFor="password">Password</label>
 					<input
 						id="password"
 						type="password"
-						className="form-input"
+						className="form-input border-green-300 focus:border-green-500 focus:ring focus:ring-green-200"
 						placeholder="••••••••"
 						{...register('password', { required: 'Password is required', minLength: { value: 8, message: 'Min 8 characters' } })}
 					/>
-					{errors.password && <p className="form-error">{errors.password.message as string}</p>}
+					{errors.password && <p className="form-error text-red-600">{errors.password.message as string}</p>}
 				</div>
-				{errors.root && <div className="alert alert-error">{errors.root.message as string}</div>}
-				<button type="submit" className="btn btn-primary w-full" disabled={submitting}>
+
+				{errors.root && <div className="alert alert-error text-red-700">{errors.root.message as string}</div>}
+
+				<button type="submit" className="btn w-full bg-green-500 hover:bg-green-600 text-white" disabled={submitting}>
 					{submitting ? 'Signing in…' : 'Sign in'}
 				</button>
 			</form>
-			<div className="mt-4 text-sm text-gray-600">
-				Don\'t have an account? <a href="/register" className="text-primary-600 hover:underline">Create one</a>
+
+			<div className="mt-4 text-sm text-green-700">
+				Don\'t have an account? <a href="/register" className="text-green-600 hover:underline">Create one</a>
 			</div>
 		</div>
+
 	);
 }

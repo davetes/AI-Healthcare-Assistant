@@ -90,6 +90,7 @@ export const endpoints = {
   },
   appointments: {
     list: '/appointments',
+    search: '/appointments/search',
     create: '/appointments',
     get: (id) => `/appointments/${id}`,
     update: (id) => `/appointments/${id}`,
