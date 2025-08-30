@@ -119,7 +119,7 @@ export default function ChatPage() {
 			<div className="flex items-center justify-between mb-4">
 				<div className="flex items-center gap-3">
 					<button className="btn btn-outline" onClick={() => router.back()} aria-label="Go back">Back</button>
-					<h1 className="text-2xl font-semibold">AI Health Chat</h1>
+					<h1 className="text-2xl font-semibold text-blue-400">AI Health Chat</h1>
 				</div>
 				<button
 					className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"

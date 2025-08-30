@@ -19,7 +19,7 @@ type Appointment = {
 };
 
 export default function AppointmentsPage() {
-    const router = useRouter();
+	const router = useRouter();
 	const [items, setItems] = useState<Appointment[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
